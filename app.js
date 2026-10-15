@@ -1,17 +1,28 @@
 
 "use strict";
 
+/*
+ * NEET AARAMBH — Biology Test Series
+ * File: app.js
+ * Requires: tests.js loaded before app.js
+ */
+
 const CONFIG = {
-  targetDate: "2027-05-02T00:00:00+05:30",
+  targetDate: "2026-10-20T00:00:00+05:30",
   timezone: "Asia/Kolkata",
   transitionSeconds: 3
 };
 
-const $ = (selector) => document.querySelector(selector);
+const $ = (selector, root = document) => root.querySelector(selector);
 
 let currentFilter = "all";
 let currentSearch = "";
 let transitionTimer = null;
+let countdownInterval = null;
+let statusInterval = null;
+let eventsConnected = false;
+
+/* ---------- DATE & STATUS ---------- */
 
 function todayInIndia() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -21,12 +32,15 @@ function todayInIndia() {
     day: "2-digit"
   }).formatToParts(new Date());
 
-  const data = {};
-  parts.forEach((part) => {
-    if (part.type !== "literal") data[part.type] = part.value;
-  });
+  const values = {};
 
-  return `${data.year}-${data.month}-${data.day}`;
+  for (const part of parts) {
+    if (part.type !== "literal") {
+      values[part.type] = part.value;
+    }
+  }
+
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function getStatus(test) {
@@ -34,6 +48,7 @@ function getStatus(test) {
 
   if (test.date < today) return "previous";
   if (test.date > today) return "upcoming";
+
   return "live";
 }
 
@@ -57,14 +72,63 @@ function formatDay(dateString) {
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
+/* ---------- SAFE DISPLAY ---------- */
+
 function escapeHTML(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     '"': "&quot;",
     "'": "&#39;"
   })[char]);
+}
+
+function setText(selector, value) {
+  const element = $(selector);
+
+  if (element) {
+    element.textContent = String(value);
+  }
+}
+
+/* ---------- TEST DATA ---------- */
+
+function getTests() {
+  if (typeof TESTS === "undefined" || !Array.isArray(TESTS)) {
+    return [];
+  }
+
+  return [...TESTS]
+    .filter(test => {
+      if (!test || !Number.isInteger(Number(test.id))) {
+        return false;
+      }
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(test.date || "")) {
+        return false;
+      }
+
+      const parsedDate = new Date(`${test.date}T00:00:00Z`);
+
+      if (Number.isNaN(parsedDate.getTime())) {
+        return false;
+      }
+
+      if (typeof test.title !== "string") {
+        return false;
+      }
+
+      if (!["chapter", "mixed", "full"].includes(test.type)) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) =>
+      a.date.localeCompare(b.date) ||
+      Number(a.id) - Number(b.id)
+    );
 }
 
 function getQuestionCount(test) {
@@ -76,31 +140,71 @@ function getDuration(test) {
 }
 
 function getTypeLabel(test) {
-  return ({
+  const labels = {
     chapter: "Chapter-wise Test",
     mixed: "Mixed Biology Test",
     full: "Full Syllabus Test"
-  })[test.type] || "Biology Test";
+  };
+
+  return labels[test.type] || "Biology Test";
+}
+
+function getCategoryLabel(test) {
+  if (test.category) {
+    return test.category;
+  }
+
+  if (test.type === "chapter") {
+    return "Biology";
+  }
+
+  if (test.type === "mixed") {
+    return "Mixed";
+  }
+
+  return "Full Syllabus";
 }
 
 function getStatusLabel(status) {
-  return ({
+  const labels = {
     live: "● LIVE TODAY",
     upcoming: "UPCOMING",
     previous: "PREVIOUS"
-  })[status];
+  };
+
+  return labels[status] || "SCHEDULED";
 }
 
+/*
+ * Supports:
+ *   ./tests/test-01.html
+ *   ../tests/test-01.html
+ *   https://example.com/test.html
+ *
+ * Add cbtUrl to a test in tests.js only when its real CBT file exists.
+ */
 function getTestUrl(test) {
-  return typeof test.cbtUrl === "string" ? test.cbtUrl.trim() : "";
+  if (typeof test.cbtUrl !== "string") {
+    return "";
+  }
+
+  const url = test.cbtUrl.trim();
+
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+
+  if (
+    (url.startsWith("./") || url.startsWith("../")) &&
+    !url.startsWith("//")
+  ) {
+    return url;
+  }
+
+  return "";
 }
 
-function getTests() {
-  if (!Array.isArray(TESTS)) return [];
-  return [...TESTS].sort((a, b) =>
-    a.date.localeCompare(b.date) || a.id - b.id
-  );
-}
+/* ---------- TEST CARDS ---------- */
 
 function renderTestCard(test) {
   const status = getStatus(test);
@@ -108,33 +212,52 @@ function renderTestCard(test) {
   const dateLabel = formatDate(test.date);
 
   let buttonLabel;
-  let buttonDisabled = false;
+  let disabled = false;
 
   if (status === "upcoming") {
     buttonLabel = `Starts on ${dateLabel}`;
-    buttonDisabled = true;
-  } else if (status === "live") {
-    buttonLabel = "Start Test →";
+    disabled = true;
+  } else if (!url) {
+    buttonLabel = status === "previous"
+      ? "Previous Test Link Pending"
+      : "CBT Link Not Added Yet";
+
+    disabled = true;
   } else {
-    buttonLabel = url ? "Open Previous Test →" : "Test Date Passed";
-    buttonDisabled = !url;
+    buttonLabel = status === "live"
+      ? "Start Test →"
+      : "Open Previous Test →";
   }
 
   return `
-    <article class="test-card" id="test-${test.id}">
+    <article class="test-card" id="test-${Number(test.id)}">
+
       <div class="test-card-top">
         <span class="test-number">
           TEST ${String(test.id).padStart(2, "0")}
         </span>
+
         <span class="status-badge status-${status}">
           ${escapeHTML(getStatusLabel(status))}
         </span>
       </div>
 
-      <h3>${escapeHTML(test.title)}</h3>
-      <span class="test-category">${escapeHTML(getTypeLabel(test))}</span>
+      <h3>
+        ${escapeHTML(test.title || `Biology Test ${test.id}`)}
+      </h3>
+
+      <div class="test-labels">
+        <span class="test-category">
+          ${escapeHTML(getTypeLabel(test))}
+        </span>
+
+        <span class="test-category category-secondary">
+          ${escapeHTML(getCategoryLabel(test))}
+        </span>
+      </div>
 
       <div class="test-meta">
+
         <div class="meta-item">
           <span aria-hidden="true">📅</span>
           <span>
@@ -166,28 +289,41 @@ function renderTestCard(test) {
             ${getDuration(test)} Minutes
           </span>
         </div>
+
       </div>
 
       <div class="syllabus-box">
         <strong>📚 Syllabus / Chapters</strong>
-        <p>${escapeHTML(test.syllabus || "Syllabus details will be updated.")}</p>
+        <p>
+          ${escapeHTML(
+            test.syllabus || "Syllabus details will be updated."
+          )}
+        </p>
       </div>
 
       <div class="test-actions">
         <button
           class="start-test-button ${status === "previous" ? "is-previous" : ""}"
           type="button"
-          data-start-test="${test.id}"
-          ${buttonDisabled ? "disabled" : ""}
-        >${escapeHTML(buttonLabel)}</button>
+          data-start-test="${Number(test.id)}"
+          ${disabled ? "disabled" : ""}
+        >
+          ${escapeHTML(buttonLabel)}
+        </button>
       </div>
+
     </article>
   `;
 }
 
+/* ---------- FILTERS & SEARCH ---------- */
+
 function renderDashboard() {
   const list = $("#test-list");
-  if (!list) return;
+
+  if (!list) {
+    return;
+  }
 
   const tests = getTests();
 
@@ -197,32 +333,61 @@ function renderDashboard() {
     upcoming: 0
   };
 
-  tests.forEach((test) => counts[getStatus(test)]++);
+  tests.forEach(test => {
+    counts[getStatus(test)]++;
+  });
 
-  $("#completed-count").textContent = counts.previous;
-  $("#live-count").textContent = counts.live;
-  $("#upcoming-count").textContent = counts.upcoming;
+  setText("#completed-count", counts.previous);
+  setText("#live-count", counts.live);
+  setText("#upcoming-count", counts.upcoming);
 
-  const visible = tests.filter((test) => {
-    const statusMatches =
-      currentFilter === "all" || getStatus(test) === currentFilter;
+  const query = currentSearch.toLocaleLowerCase();
 
-    const searchText = [
+  const visibleTests = tests.filter(test => {
+    const status = getStatus(test);
+
+    const matchesFilter =
+      currentFilter === "all" ||
+      status === currentFilter;
+
+    const searchableText = [
       test.id,
       test.title,
       test.type,
       test.category,
       test.syllabus,
-      formatDate(test.date)
-    ].join(" ").toLowerCase();
+      test.date,
+      formatDate(test.date),
+      formatDay(test.date)
+    ]
+      .join(" ")
+      .toLocaleLowerCase();
 
-    return statusMatches && searchText.includes(currentSearch.toLowerCase());
+    return matchesFilter && searchableText.includes(query);
   });
 
-  list.innerHTML = visible.length
-    ? visible.map(renderTestCard).join("")
-    : `<div class="empty-state">No tests found. Try another filter or search.</div>`;
+  if (visibleTests.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        No tests found. Try another filter or search.
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = visibleTests.map(renderTestCard).join("");
 }
+
+function updateFilterButtons(activeButton) {
+  document.querySelectorAll("[data-filter]").forEach(button => {
+    const isActive = button === activeButton;
+
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+/* ---------- COUNTDOWN ---------- */
 
 function updateCountdown() {
   const target = new Date(CONFIG.targetDate).getTime();
@@ -236,58 +401,99 @@ function updateCountdown() {
     seconds: totalSeconds % 60
   };
 
-  Object.entries(values).forEach(([id, value]) => {
+  for (const [id, value] of Object.entries(values)) {
     const element = document.getElementById(id);
+
     if (element) {
       element.textContent = id === "days"
         ? String(value)
         : String(value).padStart(2, "0");
     }
+  }
+}
+
+/* ---------- PAGE NAVIGATION ---------- */
+
+function updateNavigation(activePage) {
+  document.querySelectorAll(".nav-link").forEach(link => {
+    const isHome =
+      link.tagName === "A" &&
+      link.getAttribute("href") === "#home";
+
+    const isTests = link.id === "nav-tests";
+
+    link.classList.toggle(
+      "active",
+      activePage === "home" ? isHome : isTests
+    );
   });
 }
 
 function showHome() {
   clearTimeout(transitionTimer);
 
-  $("#transition-screen").hidden = true;
-  $("#dashboard").hidden = true;
-  $("#home").hidden = false;
+  const transition = $("#transition-screen");
+  const dashboard = $("#dashboard");
+  const home = $("#home");
 
-  document.querySelectorAll(".nav-link").forEach((link) => {
-    link.classList.toggle(link.tagName === "A" && link.getAttribute("href") === "#home", "active");
+  if (transition) transition.hidden = true;
+  if (dashboard) dashboard.hidden = true;
+  if (home) home.hidden = false;
+
+  updateNavigation("home");
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
   });
-
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function showDashboard() {
-  $("#home").hidden = true;
-  $("#dashboard").hidden = false;
-  $("#transition-screen").hidden = true;
+  clearTimeout(transitionTimer);
 
+  const home = $("#home");
+  const dashboard = $("#dashboard");
+  const transition = $("#transition-screen");
+
+  if (home) home.hidden = true;
+  if (dashboard) dashboard.hidden = false;
+  if (transition) transition.hidden = true;
+
+  updateNavigation("tests");
   renderDashboard();
 
-  document.querySelectorAll(".nav-link").forEach((link) => {
-    link.classList.toggle(link.id === "nav-tests", "active");
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
   });
-
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function startDashboardTransition() {
+  clearTimeout(transitionTimer);
+
   const transition = $("#transition-screen");
   const counter = $("#transition-seconds");
+  const home = $("#home");
+  const dashboard = $("#dashboard");
 
-  $("#home").hidden = true;
-  $("#dashboard").hidden = true;
+  if (!transition || !counter || !home || !dashboard) {
+    showDashboard();
+    return;
+  }
+
+  home.hidden = true;
+  dashboard.hidden = true;
   transition.hidden = false;
 
-  let remaining = CONFIG.transitionSeconds;
-  counter.textContent = remaining;
+  updateNavigation("tests");
 
-  const tick = () => {
+  let remaining = CONFIG.transitionSeconds;
+  counter.textContent = String(remaining);
+
+  function tick() {
     remaining--;
-    counter.textContent = Math.max(remaining, 0);
+
+    counter.textContent = String(Math.max(remaining, 0));
 
     if (remaining <= 0) {
       showDashboard();
@@ -295,80 +501,184 @@ function startDashboardTransition() {
     }
 
     transitionTimer = window.setTimeout(tick, 1000);
-  };
+  }
 
   transitionTimer = window.setTimeout(tick, 1000);
 }
 
-function connectEvents() {
-  $("#enter-series").addEventListener("click", startDashboardTransition);
-  $("#nav-tests").addEventListener("click", showDashboard);
-  $("#back-home").addEventListener("click", showHome);
-  $("#bottom-home").addEventListener("click", showHome);
+/* ---------- CBT OPENING ---------- */
 
-  document.querySelectorAll('a[href="#home"]').forEach((link) => {
-    link.addEventListener("click", (event) => {
+function handleTestOpen(button) {
+  if (!button || button.disabled) {
+    return;
+  }
+
+  const testId = Number(button.dataset.startTest);
+
+  const test = getTests().find(item =>
+    Number(item.id) === testId
+  );
+
+  if (!test) {
+    alert("Test details could not be found. Please refresh the page.");
+    return;
+  }
+
+  const status = getStatus(test);
+
+  if (status === "upcoming") {
+    alert(`This test starts on ${formatDate(test.date)}.`);
+    return;
+  }
+
+  const url = getTestUrl(test);
+
+  if (!url) {
+    alert(
+      "The CBT link for this test has not been added yet. Please contact your test-series coordinator."
+    );
+    return;
+  }
+
+  window.location.href = url;
+}
+
+/* ---------- EVENT LISTENERS ---------- */
+
+function connectEvents() {
+  if (eventsConnected) {
+    return;
+  }
+
+  eventsConnected = true;
+
+  const enterSeries = $("#enter-series");
+  const navTests = $("#nav-tests");
+  const backHome = $("#back-home");
+  const bottomHome = $("#bottom-home");
+  const search = $("#test-search");
+  const list = $("#test-list");
+
+  if (enterSeries) {
+    enterSeries.addEventListener(
+      "click",
+      startDashboardTransition
+    );
+  }
+
+  if (navTests) {
+    navTests.addEventListener("click", showDashboard);
+  }
+
+  if (backHome) {
+    backHome.addEventListener("click", showHome);
+  }
+
+  if (bottomHome) {
+    bottomHome.addEventListener("click", showHome);
+  }
+
+  document.querySelectorAll('a[href="#home"]').forEach(link => {
+    link.addEventListener("click", event => {
       event.preventDefault();
       showHome();
     });
   });
 
-  document.querySelectorAll("[data-filter]").forEach((button) => {
+  document.querySelectorAll("[data-filter]").forEach(button => {
     button.addEventListener("click", () => {
-      currentFilter = button.dataset.filter || "all";
+      const nextFilter = button.dataset.filter || "all";
 
-      document.querySelectorAll("[data-filter]").forEach((item) => {
-        item.classList.toggle("active", item === button);
-      });
+      if (!["all", "live", "upcoming", "previous"].includes(nextFilter)) {
+        return;
+      }
 
+      currentFilter = nextFilter;
+      updateFilterButtons(button);
       renderDashboard();
     });
   });
 
-  $("#test-search").addEventListener("input", (event) => {
-    currentSearch = event.target.value.trim();
-    renderDashboard();
-  });
+  if (search) {
+    search.addEventListener("input", event => {
+      currentSearch = event.target.value.trim();
+      renderDashboard();
+    });
+  }
 
-  $("#test-list").addEventListener("click", (event) => {
-    const button = event.target.closest("[data-start-test]");
-    if (!button || button.disabled) return;
-
-    const testId = Number(button.dataset.startTest);
-    const test = getTests().find((item) => item.id === testId);
-    if (!test) return;
-
-    const url = getTestUrl(test);
-
-    if (!url) {
-      alert(
-        "The scheduled test is live, but its CBT link has not been connected yet. Please contact your test-series coordinator."
-      );
-      return;
-    }
-
-    window.location.href = url;
-  });
+  if (list) {
+    list.addEventListener("click", event => {
+      const button = event.target.closest("[data-start-test]");
+      handleTestOpen(button);
+    });
+  }
 }
 
+/* ---------- INITIALISATION ---------- */
+
 function initialiseApp() {
-  if (!Array.isArray(TESTS)) {
-    console.error("TESTS was not found. Check tests.js.");
+  const rawTests =
+    typeof TESTS !== "undefined" && Array.isArray(TESTS)
+      ? TESTS
+      : null;
+
+  const tests = getTests();
+
+  if (!rawTests || tests.length === 0) {
+    console.error(
+      "Test schedule could not be loaded. Check tests.js and script order."
+    );
+
+    const list = $("#test-list");
+
+    if (list) {
+      list.innerHTML = `
+        <div class="empty-state">
+          Test schedule could not be loaded. Please refresh the page or contact support.
+        </div>
+      `;
+    }
+
+    connectEvents();
     return;
+  }
+
+  if (tests.length !== 50) {
+    console.warn(
+      `Expected 50 valid tests, but found ${tests.length}.`
+    );
+  }
+
+  const ids = tests.map(test => Number(test.id));
+
+  if (new Set(ids).size !== ids.length) {
+    console.warn("Duplicate test IDs detected in tests.js.");
   }
 
   connectEvents();
   updateCountdown();
   renderDashboard();
 
-  window.setInterval(updateCountdown, 1000);
+  clearInterval(countdownInterval);
+  clearInterval(statusInterval);
 
-  // Refresh test status when the date changes.
-  window.setInterval(renderDashboard, 60 * 1000);
+  countdownInterval = window.setInterval(
+    updateCountdown,
+    1000
+  );
+
+  statusInterval = window.setInterval(
+    renderDashboard,
+    60 * 1000
+  );
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initialiseApp);
+  document.addEventListener(
+    "DOMContentLoaded",
+    initialiseApp,
+    { once: true }
+  );
 } else {
   initialiseApp();
 }
