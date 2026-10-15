@@ -1,6 +1,11 @@
 
 "use strict";
 
+/* ==========================================
+   NEET AARAMBH — BIOLOGY TEST SERIES
+   Complete app.js replacement
+   ========================================== */
+
 const CONFIG = {
   seriesStart: "2026-10-20",
   timezone: "Asia/Kolkata",
@@ -30,22 +35,22 @@ function todayInIndia() {
     day: "2-digit"
   }).formatToParts(new Date());
 
-  const result = {};
+  const values = {};
 
   parts.forEach(part => {
     if (part.type !== "literal") {
-      result[part.type] = part.value;
+      values[part.type] = part.value;
     }
   });
 
-  return `${result.year}-${result.month}-${result.day}`;
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function getStatus(test) {
   const today = todayInIndia();
 
-  if (test.date < today) return "previous";
-  if (test.date > today) return "upcoming";
+  if (today < test.date) return "upcoming";
+  if (today > test.date) return "previous";
 
   return "live";
 }
@@ -119,11 +124,10 @@ function getTypeLabel(test) {
 function getCategoryLabel(test) {
   if (test.category) return test.category;
 
-  return test.type === "chapter"
-    ? "Biology"
-    : test.type === "mixed"
-      ? "Mixed"
-      : "Full Syllabus";
+  if (test.type === "chapter") return "Biology";
+  if (test.type === "mixed") return "Mixed";
+
+  return "Full Syllabus";
 }
 
 function getStatusLabel(status) {
@@ -134,59 +138,62 @@ function getStatusLabel(status) {
   }[status] || "SCHEDULED";
 }
 
-/* ---------- AUTOMATIC CBT FILE DETECTION ---------- */
+/* ---------- CBT FILE PATH ---------- */
 
 /*
-  Expected filenames:
+  Default file naming:
   cbt/test-01.html
   cbt/test-02.html
   ...
   cbt/test-50.html
 
-  A test is startable only when:
-  1. Its scheduled date is today.
-  2. Its CBT HTML file exists.
+  A test can only open on or after its scheduled date.
 */
 
 function getCbtUrl(test) {
-  // A manually supplied URL takes priority.
   if (typeof test.cbtUrl === "string" && test.cbtUrl.trim()) {
-    const url = test.cbtUrl.trim();
+    const customUrl = test.cbtUrl.trim();
 
-    if (/^https?:\/\//i.test(url)) return url;
+    if (/^https?:\/\//i.test(customUrl)) {
+      return customUrl;
+    }
 
     if (
-      (url.startsWith("./") || url.startsWith("../")) &&
-      !url.startsWith("//")
+      (customUrl.startsWith("./") ||
+       customUrl.startsWith("../")) &&
+      !customUrl.startsWith("//")
     ) {
-      return url;
+      return customUrl;
     }
   }
 
   const number = String(Number(test.id)).padStart(2, "0");
+
   return `${CONFIG.cbtFolder}test-${number}.html`;
 }
+
+/* ---------- CHECK WHETHER CBT EXISTS ---------- */
 
 async function checkCbtFile(test) {
   const id = Number(test.id);
 
-  if (cbtAvailability.has(id) || cbtChecksInProgress.has(id)) {
+  if (
+    cbtAvailability.has(id) ||
+    cbtChecksInProgress.has(id)
+  ) {
     return;
   }
 
   cbtChecksInProgress.add(id);
 
-  const url = getCbtUrl(test);
-
   try {
-    // HEAD checks whether the static HTML file exists without
-    // downloading the full question paper.
+    const url = getCbtUrl(test);
+
     let response = await fetch(url, {
       method: "HEAD",
       cache: "no-store"
     });
 
-    // Some static hosts do not support HEAD. Try GET as fallback.
     if (response.status === 405 || response.status === 501) {
       response = await fetch(url, {
         method: "GET",
@@ -197,7 +204,11 @@ async function checkCbtFile(test) {
     cbtAvailability.set(id, response.ok);
   } catch (error) {
     cbtAvailability.set(id, false);
-    console.warn(`Could not verify CBT file for Test ${id}.`, error);
+
+    console.warn(
+      `Could not verify CBT file for Test ${id}.`,
+      error
+    );
   } finally {
     cbtChecksInProgress.delete(id);
     renderDashboard();
@@ -240,31 +251,32 @@ function updateCountdown() {
   const message = $("#countdown-message");
 
   if (message) {
-    message.textContent = remaining > 0
-      ? "Your first scheduled test begins on 20 October 2026."
-      : "The test series has started. Check today's test in the dashboard.";
+    message.textContent =
+      remaining > 0
+        ? "Your first scheduled test begins on 20 October 2026."
+        : "The test series has started. Check today's test in the dashboard.";
   }
 }
 
-/* ---------- TEST CARDS ---------- */
+/* ---------- RENDER TEST CARD ---------- */
 
 function renderTestCard(test) {
+  const id = Number(test.id);
   const status = getStatus(test);
   const url = getCbtUrl(test);
-  const id = Number(test.id);
   const dateLabel = formatDate(test.date);
 
-  const fileKnown = cbtAvailability.has(id);
+  const fileChecked = cbtAvailability.has(id);
   const fileExists = cbtAvailability.get(id) === true;
-  const fileChecking = cbtChecksInProgress.has(id);
+  const checking = cbtChecksInProgress.has(id);
 
-  let buttonLabel = "";
+  let buttonLabel;
   let disabled = false;
 
   if (status === "upcoming") {
     buttonLabel = `Starts on ${dateLabel}`;
     disabled = true;
-  } else if (fileChecking || !fileKnown) {
+  } else if (checking || !fileChecked) {
     buttonLabel = "Checking Test File…";
     disabled = true;
   } else if (!fileExists) {
@@ -278,6 +290,7 @@ function renderTestCard(test) {
 
   return `
     <article class="test-card" id="test-${id}">
+
       <div class="test-card-top">
         <span class="test-number">
           TEST ${String(id).padStart(2, "0")}
@@ -288,7 +301,9 @@ function renderTestCard(test) {
         </span>
       </div>
 
-      <h3>${escapeHTML(test.title || `Biology Test ${id}`)}</h3>
+      <h3>
+        ${escapeHTML(test.title || `Biology Test ${id}`)}
+      </h3>
 
       <div class="test-labels">
         <span class="test-category">
@@ -301,6 +316,7 @@ function renderTestCard(test) {
       </div>
 
       <div class="test-meta">
+
         <div class="meta-item">
           <span aria-hidden="true">📅</span>
           <span>
@@ -332,11 +348,16 @@ function renderTestCard(test) {
             ${getDuration(test)} Minutes
           </span>
         </div>
+
       </div>
 
       <div class="syllabus-box">
         <strong>📚 Syllabus / Chapters</strong>
-        <p>${escapeHTML(test.syllabus || "Syllabus details will be updated.")}</p>
+        <p>
+          ${escapeHTML(
+            test.syllabus || "Syllabus details will be updated."
+          )}
+        </p>
       </div>
 
       <div class="test-actions">
@@ -345,16 +366,20 @@ function renderTestCard(test) {
           type="button"
           data-start-test="${id}"
           ${disabled ? "disabled" : ""}
-        >${escapeHTML(buttonLabel)}</button>
+        >
+          ${escapeHTML(buttonLabel)}
+        </button>
       </div>
+
     </article>
   `;
 }
 
-/* ---------- DASHBOARD, SEARCH & FILTERS ---------- */
+/* ---------- DASHBOARD, FILTERS & SEARCH ---------- */
 
 function renderDashboard() {
   const list = $("#test-list");
+
   if (!list) return;
 
   const tests = getTests();
@@ -383,9 +408,10 @@ function renderDashboard() {
     const status = getStatus(test);
 
     const matchesFilter =
-      currentFilter === "all" || currentFilter === status;
+      currentFilter === "all" ||
+      currentFilter === status;
 
-    const text = [
+    const searchableText = [
       test.id,
       test.title,
       test.type,
@@ -396,7 +422,7 @@ function renderDashboard() {
       formatDay(test.date)
     ].join(" ").toLocaleLowerCase();
 
-    return matchesFilter && text.includes(query);
+    return matchesFilter && searchableText.includes(query);
   });
 
   list.innerHTML = visibleTests.length
@@ -409,7 +435,8 @@ function renderDashboard() {
 function updateNavigation(page) {
   document.querySelectorAll(".nav-link").forEach(link => {
     const isHome =
-      link.tagName === "A" && link.getAttribute("href") === "#home";
+      link.tagName === "A" &&
+      link.getAttribute("href") === "#home";
 
     const isTests = link.id === "nav-tests";
 
@@ -432,7 +459,11 @@ function showHome() {
   if (home) home.hidden = false;
 
   updateNavigation("home");
-  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
 }
 
 function showDashboard() {
@@ -450,7 +481,10 @@ function showDashboard() {
   renderDashboard();
   checkAllCbtFiles();
 
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
 }
 
 function startDashboardTransition() {
@@ -477,6 +511,7 @@ function startDashboardTransition() {
 
   function tick() {
     seconds--;
+
     counter.textContent = String(Math.max(seconds, 0));
 
     if (seconds <= 0) {
@@ -490,29 +525,43 @@ function startDashboardTransition() {
   transitionTimer = setTimeout(tick, 1000);
 }
 
-/* ---------- OPEN TEST ---------- */
+/* ---------- STRICT TEST DATE LOCK ---------- */
 
 function handleTestOpen(button) {
   if (!button || button.disabled) return;
 
   const id = Number(button.dataset.startTest);
-  const test = getTests().find(item => Number(item.id) === id);
+
+  const test = getTests().find(item =>
+    Number(item.id) === id
+  );
 
   if (!test) {
     alert("Test details could not be found. Please refresh the page.");
     return;
   }
 
-  if (getStatus(test) === "upcoming") {
-    alert(`This test starts on ${formatDate(test.date)}.`);
+  // SAFETY LOCK:
+  // Uploading the CBT file early never makes a future test start early.
+  const today = todayInIndia();
+
+  if (today < test.date) {
+    alert(
+      `This test will be available on ${formatDate(test.date)}.`
+    );
     return;
   }
 
+  // Do not open the test until its file has been detected.
   if (cbtAvailability.get(id) !== true) {
-    alert("The CBT file has not been detected. Please check the uploaded file path.");
+    alert(
+      "The CBT file is not available yet. Please try again later."
+    );
+    checkCbtFile(test);
     return;
   }
 
+  // A previous test can be opened, but a future test cannot.
   window.location.href = getCbtUrl(test);
 }
 
@@ -529,10 +578,21 @@ function connectEvents() {
   const search = $("#test-search");
   const list = $("#test-list");
 
-  if (enter) enter.addEventListener("click", startDashboardTransition);
-  if (navTests) navTests.addEventListener("click", showDashboard);
-  if (back) back.addEventListener("click", showHome);
-  if (bottomHome) bottomHome.addEventListener("click", showHome);
+  if (enter) {
+    enter.addEventListener("click", startDashboardTransition);
+  }
+
+  if (navTests) {
+    navTests.addEventListener("click", showDashboard);
+  }
+
+  if (back) {
+    back.addEventListener("click", showHome);
+  }
+
+  if (bottomHome) {
+    bottomHome.addEventListener("click", showHome);
+  }
 
   document.querySelectorAll('a[href="#home"]').forEach(link => {
     link.addEventListener("click", event => {
@@ -553,6 +613,7 @@ function connectEvents() {
 
       document.querySelectorAll("[data-filter]").forEach(item => {
         const active = item === button;
+
         item.classList.toggle("active", active);
         item.setAttribute("aria-pressed", String(active));
       });
@@ -570,39 +631,46 @@ function connectEvents() {
 
   if (list) {
     list.addEventListener("click", event => {
-      handleTestOpen(event.target.closest("[data-start-test]"));
+      const button = event.target.closest("[data-start-test]");
+      handleTestOpen(button);
     });
   }
 }
 
-/* ---------- STARTUP ---------- */
+/* ---------- INITIALISATION ---------- */
 
 function initialiseApp() {
   const tests = getTests();
 
   if (!tests.length) {
+    console.error(
+      "No valid tests found. Check tests.js and script order."
+    );
+
     const list = $("#test-list");
 
     if (list) {
       list.innerHTML = `
         <div class="empty-state">
-          Test schedule could not be loaded. Check tests.js and refresh.
+          Test schedule could not be loaded. Please refresh the page.
         </div>
       `;
     }
 
-    console.error("No valid tests found in tests.js.");
     connectEvents();
     updateCountdown();
     return;
   }
 
+  if (tests.length !== 50) {
+    console.warn(
+      `Expected 50 tests, but found ${tests.length}.`
+    );
+  }
+
   connectEvents();
   updateCountdown();
   renderDashboard();
-
-  // Check CBT files when the dashboard is opened.
-  // This also allows newly uploaded files to be detected after refresh.
   checkAllCbtFiles();
 
   clearInterval(countdownInterval);
@@ -617,7 +685,11 @@ function initialiseApp() {
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initialiseApp, { once: true });
+  document.addEventListener(
+    "DOMContentLoaded",
+    initialiseApp,
+    { once: true }
+  );
 } else {
   initialiseApp();
 }
