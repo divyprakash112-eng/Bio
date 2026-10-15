@@ -7,10 +7,12 @@
   <meta name="theme-color" content="#0b4eb3">
   <meta name="description" content="NEET AARAMBH Biology Test Series — 50 scheduled Biology tests.">
   <title>NEET AARAMBH | Biology Test Series</title>
+
   <link rel="stylesheet" href="style.css">
   <script src="tests.js" defer></script>
   <script src="app.js" defer></script>
 </head>
+
 <body>
   <header class="site-header">
     <a class="brand" href="#home" aria-label="NEET AARAMBH Home">
@@ -29,7 +31,6 @@
   </nav>
 
   <main>
-    <!-- HOME: keep this section clean -->
     <section class="page-section home-section" id="home">
       <div class="hero">
         <div class="hero-copy">
@@ -41,16 +42,19 @@
             <div class="countdown-heading">
               <span class="calendar-icon">▦</span>
               <div>
-                <strong>NEET Countdown</strong>
-                <small>Target date: 2 May 2027</small>
+                <strong>Test Series Countdown</strong>
+                <small>Series starts: <time datetime="2026-10-20">20 October 2026</time></small>
               </div>
             </div>
-            <div class="countdown-grid">
+
+            <div class="countdown-grid" aria-label="Countdown to test series start">
               <div><strong id="days">—</strong><span>Days</span></div>
               <div><strong id="hours">—</strong><span>Hours</span></div>
               <div><strong id="minutes">—</strong><span>Minutes</span></div>
               <div><strong id="seconds">—</strong><span>Seconds</span></div>
             </div>
+
+            <p id="countdown-message" aria-live="polite"></p>
           </div>
         </div>
       </div>
@@ -77,7 +81,6 @@
       </div>
     </section>
 
-    <!-- TRANSITION -->
     <section class="transition-screen" id="transition-screen" hidden>
       <div class="transition-logo">NA</div>
       <p class="eyebrow">NEET AARAMBH</p>
@@ -86,7 +89,6 @@
       <p>Please wait a moment…</p>
     </section>
 
-    <!-- DASHBOARD: separate from homepage -->
     <section class="page-section dashboard-section" id="dashboard" hidden>
       <div class="dashboard-heading">
         <div>
@@ -103,25 +105,28 @@
           <strong id="completed-count">0</strong>
           <small>Scheduled date has passed</small>
         </article>
+
         <article class="stat-card live-stat">
           <span class="stat-label">Live Tests</span>
           <strong id="live-count">0</strong>
           <small>Scheduled for today</small>
         </article>
+
         <article class="stat-card">
           <span class="stat-label">Upcoming Tests</span>
-          <strong id="upcoming-count">50</strong>
+          <strong id="upcoming-count">0</strong>
           <small>Future scheduled tests</small>
         </article>
       </div>
 
       <div class="dashboard-tools">
         <div class="filter-row" aria-label="Filter tests">
-          <button class="filter-button active" data-filter="all" type="button">All Tests</button>
-          <button class="filter-button" data-filter="live" type="button">● Live</button>
-          <button class="filter-button" data-filter="upcoming" type="button">Upcoming</button>
-          <button class="filter-button" data-filter="previous" type="button">Previous</button>
+          <button class="filter-button active" data-filter="all" type="button" aria-pressed="true">All Tests</button>
+          <button class="filter-button" data-filter="live" type="button" aria-pressed="false">● Live</button>
+          <button class="filter-button" data-filter="upcoming" type="button" aria-pressed="false">Upcoming</button>
+          <button class="filter-button" data-filter="previous" type="button" aria-pressed="false">Previous</button>
         </div>
+
         <label class="search-box">
           <span aria-hidden="true">⌕</span>
           <input id="test-search" type="search" placeholder="Search test or chapter…" autocomplete="off">
