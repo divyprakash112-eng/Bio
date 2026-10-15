@@ -1,0 +1,314 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0755c9">
+  <meta name="description" content="NEET AARAMBH Biology Test Series 2026–27">
+  <title>NEET AARAMBH | Biology Test Series</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="tests.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+
+<body>
+  <!-- HEADER -->
+  <header class="site-header">
+    <a href="#home" class="brand" aria-label="NEET AARAMBH Home">
+      <span class="brand-mark">NA</span>
+      <span class="brand-copy">
+        <strong>NEET AARAMBH</strong>
+        <small>Biology Test Series</small>
+      </span>
+    </a>
+
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="#home">Home</a>
+      <a href="#dashboard">Tests</a>
+      <a href="#planner">Test Planner</a>
+    </nav>
+
+    <span class="session-badge">2026–27 SESSION</span>
+  </header>
+
+  <main class="main-container" id="home">
+
+    <!-- HERO -->
+    <section class="hero-section">
+      <div class="hero-copy">
+        <span class="eyebrow">LEARN · PRACTICE · IMPROVE</span>
+        <h1>Your Biology Preparation.<br>
+          <span>One Test at a Time.</span>
+        </h1>
+        <p>
+          A structured 50-test Biology series designed around
+          your NEET AARAMBH test planner.
+        </p>
+
+        <div class="hero-actions">
+          <a class="primary-button" href="#dashboard">
+            Explore Test Series <span aria-hidden="true">→</span>
+          </a>
+          <a class="secondary-button" href="#planner">View Planner</a>
+        </div>
+
+        <div class="trust-line">
+          <span class="online-dot"></span>
+          <span>50 Scheduled Tests · Biology</span>
+        </div>
+      </div>
+
+      <aside class="countdown-card">
+        <div class="countdown-top">
+          <span class="countdown-icon">◷</span>
+          <div>
+            <p class="mini-label">YOUR NEET GOAL</p>
+            <h2>Countdown</h2>
+          </div>
+        </div>
+
+        <p class="countdown-subtitle">Time remaining until 2 May 2027</p>
+
+        <div class="countdown-grid">
+          <div class="countdown-unit">
+            <strong id="days">---</strong>
+            <span>Days</span>
+          </div>
+          <div class="countdown-unit">
+            <strong id="hours">--</strong>
+            <span>Hours</span>
+          </div>
+          <div class="countdown-unit">
+            <strong id="minutes">--</strong>
+            <span>Minutes</span>
+          </div>
+          <div class="countdown-unit">
+            <strong id="seconds">--</strong>
+            <span>Seconds</span>
+          </div>
+        </div>
+
+        <p class="countdown-note">
+          Target date is configurable in app.js.
+        </p>
+      </aside>
+    </section>
+
+    <!-- SERIES SUMMARY -->
+    <section class="stats-grid" aria-label="Test series overview">
+      <article class="stat-card">
+        <span class="stat-icon">▤</span>
+        <div>
+          <strong>50</strong>
+          <span>Total Tests</span>
+        </div>
+      </article>
+
+      <article class="stat-card">
+        <span class="stat-icon">▣</span>
+        <div>
+          <strong>32</strong>
+          <span>Chapter-wise Tests</span>
+        </div>
+      </article>
+
+      <article class="stat-card">
+        <span class="stat-icon">◈</span>
+        <div>
+          <strong>8</strong>
+          <span>Mixed Tests</span>
+        </div>
+      </article>
+
+      <article class="stat-card">
+        <span class="stat-icon">▤</span>
+        <div>
+          <strong>10</strong>
+          <span>Full-Syllabus Tests</span>
+        </div>
+      </article>
+    </section>
+
+    <!-- ENTER SERIES -->
+    <section class="series-section">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">YOUR NEXT STEP</span>
+          <h2>Biology Test Series</h2>
+          <p>Find your scheduled test and prepare with confidence.</p>
+        </div>
+      </div>
+
+      <button class="series-card" id="enter-series" type="button">
+        <span class="series-card-content">
+          <span class="series-tag">NEET AARAMBH · 2026–27</span>
+          <strong>50-Test Biology Challenge</strong>
+          <span>Chapter-wise · Mixed · Full Syllabus</span>
+          <span class="series-cta">Enter Test Dashboard <span>→</span></span>
+        </span>
+        <span class="series-art" aria-hidden="true">✦</span>
+      </button>
+    </section>
+
+    <!-- TRANSITION -->
+    <div class="transition-screen" id="transition-screen"
+         aria-live="polite" hidden>
+      <div class="transition-content">
+        <div class="transition-symbol">NA</div>
+        <h2>Preparing Your Test Dashboard</h2>
+        <p>Please wait a moment...</p>
+        <div class="transition-progress">
+          <span></span>
+        </div>
+        <strong><span id="transition-seconds">3</span> seconds</strong>
+      </div>
+    </div>
+
+    <!-- TEST DASHBOARD -->
+    <section class="dashboard-section" id="dashboard">
+      <div class="section-heading dashboard-heading">
+        <div>
+          <span class="eyebrow">YOUR TEST CENTRE</span>
+          <h2>Test Dashboard</h2>
+          <p>Tests are organised automatically using the published schedule.</p>
+        </div>
+        <button class="secondary-button" id="back-home" type="button">
+          ← Back to Home
+        </button>
+      </div>
+
+      <div class="dashboard-stats">
+        <article class="dashboard-stat">
+          <span>Previous Tests</span>
+          <strong id="completed-count">0</strong>
+        </article>
+        <article class="dashboard-stat live-stat">
+          <span>Live Tests</span>
+          <strong id="live-count">0</strong>
+        </article>
+        <article class="dashboard-stat">
+          <span>Upcoming Tests</span>
+          <strong id="upcoming-count">50</strong>
+        </article>
+      </div>
+
+      <!-- STATUS FILTERS -->
+      <div class="filter-bar" role="group" aria-label="Filter tests">
+        <button class="filter-button active" data-filter="all" type="button">
+          All Tests
+        </button>
+        <button class="filter-button" data-filter="live" type="button">
+          ● Live
+        </button>
+        <button class="filter-button" data-filter="upcoming" type="button">
+          Upcoming
+        </button>
+        <button class="filter-button" data-filter="previous" type="button">
+          Previous
+        </button>
+      </div>
+
+      <div class="dashboard-toolbar">
+        <label for="test-search">Find a test</label>
+        <input id="test-search" type="search"
+               placeholder="Search test number, chapter or syllabus...">
+      </div>
+
+      <div class="test-list" id="test-list">
+        <div class="loading-state">
+          Loading your 50-test schedule...
+        </div>
+      </div>
+
+      <p class="dashboard-footnote">
+        Test availability follows the scheduled date and time.
+        CBT links become usable after the corresponding test file is uploaded.
+      </p>
+    </section>
+
+    <!-- TEST PLANNER -->
+    <section class="planner-section" id="planner">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">YOUR COMPLETE SCHEDULE</span>
+          <h2>Test Planner</h2>
+          <p>Check test dates, chapters, question counts and durations.</p>
+        </div>
+      </div>
+
+      <div class="planner-overview">
+        <div class="planner-phase">
+          <span class="phase-label">PHASE 1</span>
+          <h3>Chapter-wise & Mixed</h3>
+          <strong>Tests 01–40</strong>
+          <p>20 Oct 2026 – 28 Feb 2027</p>
+        </div>
+
+        <div class="planner-phase phase-two">
+          <span class="phase-label">PHASE 2</span>
+          <h3>Full-Syllabus Mocks</h3>
+          <strong>Tests 41–50</strong>
+          <p>7 Mar – 30 Apr 2027</p>
+        </div>
+      </div>
+
+      <div class="planner-controls">
+        <label for="planner-month">Browse schedule</label>
+        <select id="planner-month">
+          <option value="all">All Months</option>
+          <option value="2026-10">October 2026</option>
+          <option value="2026-11">November 2026</option>
+          <option value="2026-12">December 2026</option>
+          <option value="2027-01">January 2027</option>
+          <option value="2027-02">February 2027</option>
+          <option value="2027-03">March 2027</option>
+          <option value="2027-04">April 2027</option>
+        </select>
+      </div>
+
+      <div class="planner-list" id="planner-list">
+        <div class="loading-state">
+          Loading the official test planner...
+        </div>
+      </div>
+    </section>
+
+    <!-- BASIC INFORMATION -->
+    <section class="instructions-section">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">BEFORE YOU BEGIN</span>
+          <h2>Test Guidelines</h2>
+        </div>
+      </div>
+
+      <div class="guidelines-grid">
+        <article class="guideline-card">
+          <span class="guideline-icon">01</span>
+          <h3>Chapter-wise</h3>
+          <p>45 questions in 45 minutes.</p>
+        </article>
+        <article class="guideline-card">
+          <span class="guideline-icon">02</span>
+          <h3>Mixed Tests</h3>
+          <p>180 questions in 180 minutes.</p>
+        </article>
+        <article class="guideline-card">
+          <span class="guideline-icon">03</span>
+          <h3>Full-Syllabus</h3>
+          <p>180 questions in 180 minutes.</p>
+        </article>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <a href="#home" class="footer-brand">NEET AARAMBH</a>
+    <p>Biology Test Series · 2026–27</p>
+    <span>Learn. Practice. Improve.</span>
+  </footer>
+</body>
+</html>
