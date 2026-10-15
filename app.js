@@ -1,69 +1,70 @@
 
 "use strict";
 
-/*
- * NEET AARAMBH - Main Application
- *
- * To connect a CBT file, add cbtUrl to its entry in tests.js:
- * cbtUrl: "tests/test-01.html"
- *
- * Status is based on the scheduled date in India Standard Time.
- */
-
 const CONFIG = {
   targetDate: "2027-05-02T00:00:00+05:30",
-  transitionSeconds: 3,
-  timezone: "Asia/Kolkata"
+  timezone: "Asia/Kolkata",
+  transitionSeconds: 3
 };
 
 const $ = (selector) => document.querySelector(selector);
 
-const dateFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: CONFIG.timezone,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit"
-});
+let currentFilter = "all";
+let currentSearch = "";
+let transitionTimer = null;
 
-function indiaToday() {
-  const parts = dateFormatter.formatToParts(new Date());
-  const values = {};
+function todayInIndia() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: CONFIG.timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
 
-  for (const part of parts) {
-    if (part.type !== "literal") values[part.type] = part.value;
-  }
+  const data = {};
+  parts.forEach((part) => {
+    if (part.type !== "literal") data[part.type] = part.value;
+  });
 
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
-function formatDate(dateString) {
-  const [year, month, day] = dateString.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "UTC",
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  }).format(date);
-}
-
-function formatDay(dateString) {
-  const [year, month, day] = dateString.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "UTC",
-    weekday: "long"
-  }).format(date);
+  return `${data.year}-${data.month}-${data.day}`;
 }
 
 function getStatus(test) {
-  const today = indiaToday();
+  const today = todayInIndia();
 
   if (test.date < today) return "previous";
   if (test.date > today) return "upcoming";
   return "live";
+}
+
+function formatDate(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC"
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function formatDay(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+
+  return new Intl.DateTimeFormat("en-IN", {
+    weekday: "long",
+    timeZone: "UTC"
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
 }
 
 function getQuestionCount(test) {
@@ -75,153 +76,113 @@ function getDuration(test) {
 }
 
 function getTypeLabel(test) {
-  const labels = {
-    chapter: "Chapter-wise",
-    mixed: "Mixed Biology",
-    full: "Full Syllabus"
-  };
-
-  return labels[test.type] || test.category || "Biology";
+  return ({
+    chapter: "Chapter-wise Test",
+    mixed: "Mixed Biology Test",
+    full: "Full Syllabus Test"
+  })[test.type] || "Biology Test";
 }
 
 function getStatusLabel(status) {
-  const labels = {
-    live: "● LIVE",
+  return ({
+    live: "● LIVE TODAY",
     upcoming: "UPCOMING",
     previous: "PREVIOUS"
-  };
-
-  return labels[status];
+  })[status];
 }
 
-function escapeHTML(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (character) => {
-    const entities = {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    };
-
-    return entities[character];
-  });
+function getTestUrl(test) {
+  return typeof test.cbtUrl === "string" ? test.cbtUrl.trim() : "";
 }
 
 function getTests() {
   if (!Array.isArray(TESTS)) return [];
-
-  return [...TESTS].sort((a, b) => {
-    return a.date.localeCompare(b.date) || a.id - b.id;
-  });
+  return [...TESTS].sort((a, b) =>
+    a.date.localeCompare(b.date) || a.id - b.id
+  );
 }
 
-function getTestUrl(test) {
-  /*
-   * A test is enabled only after its actual CBT URL
-   * is added to that test's object in tests.js.
-   */
-  return typeof test.cbtUrl === "string" &&
-    test.cbtUrl.trim().length > 0
-    ? test.cbtUrl.trim()
-    : "";
-}
-
-function renderTestCard(test, plannerMode = false) {
+function renderTestCard(test) {
   const status = getStatus(test);
-  const questions = getQuestionCount(test);
-  const duration = getDuration(test);
   const url = getTestUrl(test);
-  const typeLabel = getTypeLabel(test);
+  const dateLabel = formatDate(test.date);
 
-  const statusHTML = `
-    <span class="status-badge status-${status}">
-      ${escapeHTML(getStatusLabel(status))}
-    </span>
-  `;
+  let buttonLabel;
+  let buttonDisabled = false;
 
-  const cardClass = plannerMode ? "planner-test" : "test-card";
-
-  const syllabusHTML = `
-    <div class="syllabus-box">
-      <strong>📚 Syllabus / Chapters</strong>
-      <p>${escapeHTML(test.syllabus)}</p>
-    </div>
-  `;
-
-  const actionHTML = `
-    <div class="test-actions">
-      <button
-        class="start-test-button"
-        type="button"
-        data-start-test="${test.id}"
-        ${!url ? "disabled" : ""}
-        title="${url ? "Open CBT test" : "Upload CBT HTML and add its URL in tests.js"}"
-      >
-        ${url ? "Start Test →" : "CBT Not Added"}
-      </button>
-      ${
-        !plannerMode
-          ? `<button class="details-button" type="button"
-              data-show-planner="${test.id}">Planner</button>`
-          : ""
-      }
-    </div>
-  `;
+  if (status === "upcoming") {
+    buttonLabel = `Starts on ${dateLabel}`;
+    buttonDisabled = true;
+  } else if (status === "live") {
+    buttonLabel = "Start Test →";
+  } else {
+    buttonLabel = url ? "Open Previous Test →" : "Test Date Passed";
+    buttonDisabled = !url;
+  }
 
   return `
-    <article class="${cardClass}" id="test-${test.id}">
-      <div class="${plannerMode ? "planner-test-top" : "test-card-top"}">
+    <article class="test-card" id="test-${test.id}">
+      <div class="test-card-top">
         <span class="test-number">
           TEST ${String(test.id).padStart(2, "0")}
         </span>
-        ${statusHTML}
+        <span class="status-badge status-${status}">
+          ${escapeHTML(getStatusLabel(status))}
+        </span>
       </div>
 
       <h3>${escapeHTML(test.title)}</h3>
-      <span class="test-category">${escapeHTML(typeLabel)}</span>
+      <span class="test-category">${escapeHTML(getTypeLabel(test))}</span>
 
       <div class="test-meta">
         <div class="meta-item">
           <span aria-hidden="true">📅</span>
-          <span><strong>Date</strong>${escapeHTML(formatDate(test.date))}</span>
+          <span>
+            <strong>Test Date</strong>
+            ${escapeHTML(dateLabel)}
+          </span>
         </div>
+
         <div class="meta-item">
-          <span aria-hidden="true">🗓</span>
-          <span><strong>Day</strong>${escapeHTML(formatDay(test.date))}</span>
+          <span aria-hidden="true">🗓️</span>
+          <span>
+            <strong>Day</strong>
+            ${escapeHTML(formatDay(test.date))}
+          </span>
         </div>
+
         <div class="meta-item">
           <span aria-hidden="true">📝</span>
-          <span><strong>Questions</strong>${questions}</span>
+          <span>
+            <strong>Questions</strong>
+            ${getQuestionCount(test)} Questions
+          </span>
         </div>
+
         <div class="meta-item">
-          <span aria-hidden="true">⏱</span>
-          <span><strong>Duration</strong>${duration} minutes</span>
+          <span aria-hidden="true">⏱️</span>
+          <span>
+            <strong>Duration</strong>
+            ${getDuration(test)} Minutes
+          </span>
         </div>
       </div>
 
-      ${syllabusHTML}
-      ${actionHTML}
+      <div class="syllabus-box">
+        <strong>📚 Syllabus / Chapters</strong>
+        <p>${escapeHTML(test.syllabus || "Syllabus details will be updated.")}</p>
+      </div>
+
+      <div class="test-actions">
+        <button
+          class="start-test-button ${status === "previous" ? "is-previous" : ""}"
+          type="button"
+          data-start-test="${test.id}"
+          ${buttonDisabled ? "disabled" : ""}
+        >${escapeHTML(buttonLabel)}</button>
+      </div>
     </article>
   `;
-}
-
-let currentFilter = "all";
-let currentSearch = "";
-
-function matchesSearch(test, search) {
-  if (!search) return true;
-
-  const searchable = [
-    test.id,
-    test.title,
-    test.category,
-    test.type,
-    test.syllabus,
-    formatDate(test.date)
-  ].join(" ").toLowerCase();
-
-  return searchable.includes(search.toLowerCase());
 }
 
 function renderDashboard() {
@@ -236,9 +197,7 @@ function renderDashboard() {
     upcoming: 0
   };
 
-  for (const test of tests) {
-    counts[getStatus(test)]++;
-  }
+  tests.forEach((test) => counts[getStatus(test)]++);
 
   $("#completed-count").textContent = counts.previous;
   $("#live-count").textContent = counts.live;
@@ -248,103 +207,110 @@ function renderDashboard() {
     const statusMatches =
       currentFilter === "all" || getStatus(test) === currentFilter;
 
-    return statusMatches && matchesSearch(test, currentSearch);
+    const searchText = [
+      test.id,
+      test.title,
+      test.type,
+      test.category,
+      test.syllabus,
+      formatDate(test.date)
+    ].join(" ").toLowerCase();
+
+    return statusMatches && searchText.includes(currentSearch.toLowerCase());
   });
 
-  if (!visible.length) {
-    list.innerHTML = `
-      <div class="empty-state">
-        No tests match your search or selected filter.
-      </div>
-    `;
-    return;
-  }
-
-  list.innerHTML = visible
-    .map((test) => renderTestCard(test))
-    .join("");
-}
-
-function renderPlanner() {
-  const list = $("#planner-list");
-  if (!list) return;
-
-  const selectedMonth = $("#planner-month")?.value || "all";
-
-  const tests = getTests().filter((test) => {
-    return selectedMonth === "all" ||
-      test.date.startsWith(selectedMonth);
-  });
-
-  if (!tests.length) {
-    list.innerHTML = `
-      <div class="empty-state">No tests found for this month.</div>
-    `;
-    return;
-  }
-
-  list.innerHTML = tests
-    .map((test) => renderTestCard(test, true))
-    .join("");
+  list.innerHTML = visible.length
+    ? visible.map(renderTestCard).join("")
+    : `<div class="empty-state">No tests found. Try another filter or search.</div>`;
 }
 
 function updateCountdown() {
   const target = new Date(CONFIG.targetDate).getTime();
-  const now = Date.now();
-  const remaining = Math.max(0, target - now);
-
+  const remaining = Math.max(0, target - Date.now());
   const totalSeconds = Math.floor(remaining / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
 
-  if ($("#days")) $("#days").textContent = days;
-  if ($("#hours")) $("#hours").textContent = String(hours).padStart(2, "0");
-  if ($("#minutes")) $("#minutes").textContent = String(minutes).padStart(2, "0");
-  if ($("#seconds")) $("#seconds").textContent = String(seconds).padStart(2, "0");
+  const values = {
+    days: Math.floor(totalSeconds / 86400),
+    hours: Math.floor((totalSeconds % 86400) / 3600),
+    minutes: Math.floor((totalSeconds % 3600) / 60),
+    seconds: totalSeconds % 60
+  };
+
+  Object.entries(values).forEach(([id, value]) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.textContent = id === "days"
+        ? String(value)
+        : String(value).padStart(2, "0");
+    }
+  });
 }
 
-function openDashboard() {
+function showHome() {
+  clearTimeout(transitionTimer);
+
+  $("#transition-screen").hidden = true;
+  $("#dashboard").hidden = true;
+  $("#home").hidden = false;
+
+  document.querySelectorAll(".nav-link").forEach((link) => {
+    link.classList.toggle(link.tagName === "A" && link.getAttribute("href") === "#home", "active");
+  });
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function showDashboard() {
+  $("#home").hidden = true;
+  $("#dashboard").hidden = false;
+  $("#transition-screen").hidden = true;
+
+  renderDashboard();
+
+  document.querySelectorAll(".nav-link").forEach((link) => {
+    link.classList.toggle(link.id === "nav-tests", "active");
+  });
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function startDashboardTransition() {
   const transition = $("#transition-screen");
   const counter = $("#transition-seconds");
 
-  if (!transition) {
-    $("#dashboard")?.scrollIntoView({ behavior: "smooth" });
-    return;
-  }
-
+  $("#home").hidden = true;
+  $("#dashboard").hidden = true;
   transition.hidden = false;
 
   let remaining = CONFIG.transitionSeconds;
-  if (counter) counter.textContent = remaining;
+  counter.textContent = remaining;
 
-  const startedAt = Date.now();
-
-  function tick() {
-    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-    remaining = Math.max(0, CONFIG.transitionSeconds - elapsed);
-
-    if (counter) counter.textContent = remaining;
+  const tick = () => {
+    remaining--;
+    counter.textContent = Math.max(remaining, 0);
 
     if (remaining <= 0) {
-      transition.hidden = true;
-      $("#dashboard")?.scrollIntoView({ behavior: "smooth" });
-      renderDashboard();
+      showDashboard();
       return;
     }
 
-    window.setTimeout(tick, 150);
-  }
+    transitionTimer = window.setTimeout(tick, 1000);
+  };
 
-  window.setTimeout(tick, 150);
+  transitionTimer = window.setTimeout(tick, 1000);
 }
 
 function connectEvents() {
-  $("#enter-series")?.addEventListener("click", openDashboard);
+  $("#enter-series").addEventListener("click", startDashboardTransition);
+  $("#nav-tests").addEventListener("click", showDashboard);
+  $("#back-home").addEventListener("click", showHome);
+  $("#bottom-home").addEventListener("click", showHome);
 
-  $("#back-home")?.addEventListener("click", () => {
-    $("#home")?.scrollIntoView({ behavior: "smooth" });
+  document.querySelectorAll('a[href="#home"]').forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      showHome();
+    });
   });
 
   document.querySelectorAll("[data-filter]").forEach((button) => {
@@ -359,64 +325,46 @@ function connectEvents() {
     });
   });
 
-  $("#test-search")?.addEventListener("input", (event) => {
+  $("#test-search").addEventListener("input", (event) => {
     currentSearch = event.target.value.trim();
     renderDashboard();
   });
 
-  $("#planner-month")?.addEventListener("change", renderPlanner);
+  $("#test-list").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-start-test]");
+    if (!button || button.disabled) return;
 
-  document.addEventListener("click", (event) => {
-    const startButton = event.target.closest("[data-start-test]");
+    const testId = Number(button.dataset.startTest);
+    const test = getTests().find((item) => item.id === testId);
+    if (!test) return;
 
-    if (startButton && !startButton.disabled) {
-      const testId = Number(startButton.dataset.startTest);
-      const test = getTests().find((item) => item.id === testId);
-      const url = test ? getTestUrl(test) : "";
+    const url = getTestUrl(test);
 
-      if (url) {
-        window.location.href = url;
-      }
-
+    if (!url) {
+      alert(
+        "The scheduled test is live, but its CBT link has not been connected yet. Please contact your test-series coordinator."
+      );
       return;
     }
 
-    const plannerButton = event.target.closest("[data-show-planner]");
-
-    if (plannerButton) {
-      const testId = Number(plannerButton.dataset.showPlanner);
-      const target = document.getElementById(`test-${testId}`);
-
-      if (target) {
-        target.scrollIntoView({ behavior: "smooth", block: "center" });
-      } else {
-        $("#planner")?.scrollIntoView({ behavior: "smooth" });
-      }
-    }
+    window.location.href = url;
   });
 }
 
 function initialiseApp() {
   if (!Array.isArray(TESTS)) {
-    console.error("tests.js did not provide a valid TESTS array.");
+    console.error("TESTS was not found. Check tests.js.");
     return;
   }
 
-  if (TESTS.length !== 50) {
-    console.warn(`Expected 50 tests, received ${TESTS.length}.`);
-  }
-
+  connectEvents();
   updateCountdown();
   renderDashboard();
-  renderPlanner();
-  connectEvents();
 
-  // Refresh status automatically when the calendar date changes.
-  window.setInterval(() => {
-    updateCountdown();
-    renderDashboard();
-    renderPlanner();
-  }, 60 * 1000);
+  window.setInterval(updateCountdown, 1000);
+
+  // Refresh test status when the date changes.
+  window.setInterval(renderDashboard, 60 * 1000);
 }
 
 if (document.readyState === "loading") {
